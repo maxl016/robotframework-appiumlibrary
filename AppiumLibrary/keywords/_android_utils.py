@@ -2,8 +2,8 @@
 import base64
 
 from .keywordgroup import KeywordGroup
+from appium.webdriver.connectiontype import ConnectionType
 from selenium.common.exceptions import TimeoutException
-from kitchen.text.converters import to_bytes
 
 class _AndroidUtilsKeywords(KeywordGroup):
 
@@ -46,7 +46,7 @@ class _AndroidUtilsKeywords(KeywordGroup):
         theFile = driver.pull_file(path)
         if decode:
             theFile = base64.b64decode(theFile)
-        return str(theFile)
+        return theFile
 
     def pull_folder(self, path, decode=False):
         """Retrieves a folder at `path`. Returns the folder's contents zipped.
@@ -72,7 +72,6 @@ class _AndroidUtilsKeywords(KeywordGroup):
          - _encode_ - True/False encode the data as base64 before writing it to the file (default=False)
         """
         driver = self._current_application()
-        data = to_bytes(data)
         if encode:
             data = base64.b64encode(data)
         driver.push_file(path, data)
@@ -144,15 +143,3 @@ class _AndroidUtilsKeywords(KeywordGroup):
         driver = self._current_application()
         if not driver.wait_activity(activity=activity, timeout=float(timeout), interval=float(interval)):
             raise TimeoutException(msg="Activity %s never presented, current activity: %s" % (activity, self.get_activity()))
-
-    def install_app(self, app_path, app_package):
-        """ Install App via Appium
-        
-        Android only.
-
-        - app_path - path to app
-        - app_package - package of install app to verify
-        """
-        driver = self._current_application()
-        driver.install_app(app_path)
-        return driver.is_app_installed(app_package)

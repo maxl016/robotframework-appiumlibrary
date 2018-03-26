@@ -2,9 +2,9 @@
 
 import os
 import robot
-import inspect
 from appium import webdriver
 from AppiumLibrary.utils import ApplicationCache
+from AppiumLibrary.utils.chromedriveradapter import ChromeDriverAdapter
 from .keywordgroup import KeywordGroup
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -14,16 +14,16 @@ class _ApplicationManagementKeywords(KeywordGroup):
     def __init__(self):
         self._cache = ApplicationCache()
         self._timeout_in_secs = float(5)
-
+        self._chromedriveradaper = ChromeDriverAdapter()
     # Public, open and close
 
     def close_application(self):
-        """Closes the current application and also close webdriver session."""
+        """Closes the current application."""
         self._debug('Closing application with session id %s' % self._current_application().session_id)
         self._cache.close()
 
     def close_all_applications(self):
-        """Closes all open applications.
+        """Closes all open applications.`
 
         This keyword is meant to be used in test or suite teardown to
         make sure all the applications are closed before the test execution
@@ -48,6 +48,7 @@ class _ApplicationManagementKeywords(KeywordGroup):
         | Open Application | http://localhost:4723/wd/hub | alias=Myapp1         | platformName=iOS      | platformVersion=7.0            | deviceName='iPhone Simulator'           | app=your.app                         |
         | Open Application | http://localhost:4723/wd/hub | platformName=Android | platformVersion=4.2.2 | deviceName=192.168.56.101:5555 | app=${CURDIR}/demoapp/OrangeDemoApp.apk | appPackage=com.netease.qa.orangedemo | appActivity=MainActivity |
         """
+
         if kwargs['platformName'] == 'Android':
             # Android 设备chrome driver 适配
             chromedriverpath = self._chromedriveradaper.adapterChromeDriver(udid=kwargs['udid'])
@@ -60,6 +61,7 @@ class _ApplicationManagementKeywords(KeywordGroup):
             # Android7.0以上版本使用uiautomator2
             if cmp(kwargs['platformVersion'], '7.0') > -1:
                 kwargs['automationName'] = 'uiautomator2'
+
                 self._debug('Android Device version is higher than 6.0, use uiautomator2')
 
         desired_caps = kwargs
@@ -95,46 +97,8 @@ class _ApplicationManagementKeywords(KeywordGroup):
             self._cache.switch(index_or_alias)
         return old_index
 
-    def launch_application(self):
-        """ Launch application. Application can be launched while Appium session running.
-        This keyword can be used to launch application during test case or between test cases.
-        
-        This keyword works while `Open Application` has a test running. This is good practice to `Launch Application`
-        and `Quit Application` between test cases. As Suite Setup is `Open Application`, `Test Setup` can be used to `Launch Application`
-       
-        Example (syntax is just a representation, refer to RF Guide for usage of Setup/Teardown):
-        | [Setup Suite] |
-        |  | Open Application | http://localhost:4723/wd/hub | platformName=Android | deviceName=192.168.56.101:5555 | app=${CURDIR}/demoapp/OrangeDemoApp.apk |
-        | [Test Setup] |
-        |  | Launch Application |
-        |  |  | <<<test execution>>> |
-        |  |  | <<<test execution>>> |
-        | [Test Teardown] |
-        |  | Quit Application |
-        | [Suite Teardown] |
-        |  | Close Application |
-        
-        See `Quit Application` for quiting application but keeping Appium sesion running.
-        
-        New in AppiumLibrary 1.4.6
-        """
-        driver = self._current_application()
-        driver.launch_app()
-
-    def quit_application(self):
-        """ Quit application. Application can be quit while Appium session is kept alive. 
-        This keyword can be used to close application during test case or between test cases.
-        
-        See `Launch Application` for an explanation.
-        
-        New in AppiumLibrary 1.4.6
-        """
-        driver = self._current_application()
-        driver.close_app()
-
     def reset_application(self):
-        """ Reset application. Open Application can be reset while Appium session is kept alive.       
-        """
+        """ Reset application """
         driver = self._current_application()
         driver.reset()
 
@@ -193,12 +157,9 @@ class _ApplicationManagementKeywords(KeywordGroup):
         if ll == 'NONE':
             return ''
         else:
-            if  "run_keyword_and_ignore_error" not in [check_error_ignored[3] for check_error_ignored in inspect.stack()]:
-                source = self._current_application().page_source
-                self._log(source, ll)
-                return source
-            else:
-                return ''
+            source = self._current_application().page_source
+            self._log(source, ll)
+            return source
 
     def go_back(self):
         """Goes one step backward in the browser history."""
@@ -244,30 +205,6 @@ class _ApplicationManagementKeywords(KeywordGroup):
         print(self._current_application().contexts)
         return self._current_application().contexts
 
-    def get_window_height(self):
-        """Get current device height.
-        
-        Example:
-        | ${width}       | Get Window Height |
-        | ${height}      | Get Window Height |
-        | Click A Point  | ${width           | ${height} |
-               
-        New in AppiumLibrary 1.4.5
-        """
-        return self._current_application().get_window_size()['height']
-
-    def get_window_width(self):
-        """Get current device width.
-        
-        Example:
-        | ${width}       | Get Window Height |
-        | ${height}      | Get Window Height |
-        | Click A Point  | ${width           | ${height} |
-        
-        New in AppiumLibrary 1.4.5
-        """
-        return self._current_application().get_window_size()['width']
-
     def switch_to_context(self, context_name):
         """Switch to a new context"""
         self._current_application().switch_to.context(context_name)
@@ -282,16 +219,6 @@ class _ApplicationManagementKeywords(KeywordGroup):
         """
         self._current_application().get(url)
 
-    def get_capability(self, capability_name):
-        """
-        Return the desired capability value by desired capability name
-        """
-        try:
-            capability = self._current_application().capabilities[capability_name]
-        except Exception as e:
-            raise e
-        return capability
-        
     # Private
 
     def _current_application(self):

@@ -32,13 +32,30 @@ class _ElementKeywords(KeywordGroup):
         self._info("Clear text field '%s'" % locator)
         self._element_clear_text_by_locator(locator)
 
-    def click_element(self, locator):
+    def click_element(self, locator, flag='Y',timeout=10):
         """Click element identified by `locator`.
 
         Key attributes for arbitrary elements are `index` and `name`. See
         `introduction` for details about locating elements.
+        flag is Y, auto screenshot. N not screenshot
         """
         self._info("Clicking element '%s'." % locator)
+        if 'session' not in str(locator):
+            self.wait_until_page_contains_element(locator, timeout)
+        if flag.lower() == 'Y'.lower():
+            self._auto_screenshot()
+        self._element_find(locator, True, True).click()
+
+    def click_element_no_wait(self, locator, flag='Y'):
+        """Click element identified by `locator`.
+
+        Key attributes for arbitrary elements are `index` and `name`. See
+        `introduction` for details about locating elements.
+         flag is Y, auto screenshot. N not screenshot.
+        """
+        self._info("Clicking element '%s'." % locator)
+        if flag.lower() == 'Y'.lower():
+            self._auto_screenshot()
         self._element_find(locator, True, True).click()
 
     def click_button(self, index_or_name):
@@ -47,6 +64,8 @@ class _ElementKeywords(KeywordGroup):
                                 'android': 'android.widget.Button'}
         if self._is_support_platform(_platform_class_dict):
             class_name = self._get_class(_platform_class_dict)
+            self.wait_until_page_contains_element(index_or_name, 5)
+            self._auto_screenshot()
             self._click_element_by_class_name(class_name, index_or_name)
 
     def click_text(self, text, exact_match=False):
@@ -58,8 +77,24 @@ class _ElementKeywords(KeywordGroup):
         If there are multiple use  of ``text`` and you do not want first one,
         use `locator` with `Get Web Elements` instead.
 
+        New in AppiumLibrary 1.4.
         """
-        self._element_find_by_text(text,exact_match).click()
+        if self._get_platform() == 'ios':
+            element = self._element_find(text, True, False)
+            if element:
+                element.click()
+            else:
+                if exact_match:
+                    _xpath = u'//*[@value="{}" or @label="{}"]'.format(text, text)
+                else:
+                    _xpath = u'//*[contains(@label,"{}") or contains(@value, "{}")]'.format(text, text)
+                self._element_find(_xpath, True, True).click()
+        elif self._get_platform() == 'android':
+            if exact_match:
+                _xpath = u'//*[@{}="{}"]'.format('text', text)
+            else:
+                _xpath = u'//*[contains(@{},"{}")]'.format('text', text)
+            self._element_find(_xpath, True, True).click()
 
     def input_text(self, locator, text):
         """Types the given `text` into text field identified by `locator`.
@@ -168,19 +203,6 @@ class _ElementKeywords(KeywordGroup):
                                  "but did not" % locator)
         self._info("Element '%s' is enabled ." % locator)
 
-    def element_should_be_visible(self, locator, loglevel='INFO'):
-        """Verifies that element identified with locator is visible.
-        
-        Key attributes for arbitrary elements are `id` and `name`. See
-        `introduction` for details about locating elements.
-        
-        New in AppiumLibrary 1.4.5
-        """
-        if not self._element_find(locator, True, True).is_displayed():
-            self.log_source(loglevel)
-            raise AssertionError("Element '%s' should be visible "
-                                 "but did not" % locator)
-
     def element_name_should_be(self, locator, expected):
         element = self._element_find(locator, True, True)
         if str(expected) != str(element.get_attribute('name')):
@@ -286,11 +308,11 @@ class _ElementKeywords(KeywordGroup):
         New in AppiumLibrary 1.4.
         """
         self._info("Verifying element '%s' contains text '%s'."
-                    % (locator, expected))
+                   % (locator, expected))
         actual = self._get_text(locator)
         if not expected in actual:
             if not message:
-                message = "Element '%s' should have contained text '%s' but "\
+                message = "Element '%s' should have contained text '%s' but " \
                           "its text was '%s'." % (locator, expected, actual)
             raise AssertionError(message)
 
@@ -320,12 +342,12 @@ class _ElementKeywords(KeywordGroup):
         New in AppiumLibrary 1.4.
         """
         self._info("Verifying element '%s' contains exactly text '%s'."
-                    % (locator, expected))
+                   % (locator, expected))
         element = self._element_find(locator, True, True)
         actual = element.text
         if expected != actual:
             if not message:
-                message = "The text of element '%s' should have been '%s' but "\
+                message = "The text of element '%s' should have been '%s' but " \
                           "in fact it was '%s'." % (locator, expected, actual)
             raise AssertionError(message)
 
@@ -364,18 +386,24 @@ class _ElementKeywords(KeywordGroup):
         | Get Element Attribute | locator | value |
         """
         elements = self._element_find(locator, False, True)
-        ele_len = len(elements)
-        if ele_len == 0:
-            raise AssertionError("Element '%s' could not be found" % locator)
-        elif ele_len > 1:
-            self._info("CAUTION: '%s' matched %s elements - using the first element only" % (locator, len(elements)))
 
-        try:
-            attr_val = elements[0].get_attribute(attribute)
-            self._info("Element '%s' attribute '%s' value '%s' " % (locator, attribute, attr_val))
+        if isinstance(elements,WebElement):
+            attr_val = elements.get_attribute(attribute)
             return attr_val
-        except:
-            raise AssertionError("Attribute '%s' is not valid for element '%s'" % (attribute, locator))
+        else:
+            ele_len = len(elements)
+            if ele_len == 0:
+                raise AssertionError("Element '%s' could not be found" % locator)
+            elif ele_len > 1:
+                self._info(
+                    "CAUTION: '%s' matched %s elements - using the first element only" % (locator, len(elements)))
+            try:
+                attr_val = elements[0].get_attribute(attribute)
+                self._info("Element '%s' attribute '%s' value '%s' " % (locator, attribute, attr_val))
+                return attr_val
+            except:
+                raise AssertionError("Attribute '%s' is not valid for element '%s'" % (attribute, locator))
+
 
     def get_element_location(self, locator):
         """Get element location
@@ -412,6 +440,26 @@ class _ElementKeywords(KeywordGroup):
         self._info("Element '%s' text is '%s' " % (locator, text))
         return text
 
+    def get_value_for_android(self, locator):
+        """
+        Get element text (for android others might cause problem)
+        Example:
+
+        | ${text} | get_text_for_android| //*[contains(@text,'foo')] |
+
+        New in AppiumLibrary 1.4.
+        """
+        element = self._element_find(locator, True, True)
+        value = element.get_attribute('value')
+        self._info("Element '%s' value is '%s' " % (locator, value))
+        return value
+
+    def get_name_for_android(self, locator):
+        element = self._element_find(locator, True, True)
+        name = element.get_attribute('name')
+        self._info("Element '%s' name is '%s' " % (locator, name))
+        return name
+
     def get_matching_xpath_count(self, xpath):
         """Returns number of elements matching ``xpath``
 
@@ -429,16 +477,6 @@ class _ElementKeywords(KeywordGroup):
         """
         count = len(self._element_find("xpath=" + xpath, False, False))
         return str(count)
-
-    def text_should_be_visible(self, text, exact_match=False, loglevel='INFO'):
-        """Verifies that element identified with text is visible.
-
-        New in AppiumLibrary 1.4.5
-        """
-        if not self._element_find_by_text(text, exact_match).is_displayed():
-            self.log_source(loglevel)
-            raise AssertionError("Text '%s' should be visible "
-                                 "but did not" % text)
 
     def xpath_should_match_x_times(self, xpath, count, error=None, loglevel='INFO'):
         """Verifies that the page contains the given number of elements located by the given ``xpath``.
@@ -459,8 +497,8 @@ class _ElementKeywords(KeywordGroup):
         actual_xpath_count = len(self._element_find("xpath=" + xpath, False, False))
         if int(actual_xpath_count) != int(count):
             if not error:
-                error = "Xpath %s should have matched %s times but matched %s times"\
-                            %(xpath, count, actual_xpath_count)
+                error = "Xpath %s should have matched %s times but matched %s times" \
+                        % (xpath, count, actual_xpath_count)
             self.log_source(loglevel)
             raise AssertionError(error)
         self._info("Current page contains %s elements matching '%s'."
@@ -561,8 +599,13 @@ class _ElementKeywords(KeywordGroup):
 
     def _element_find(self, locator, first_only, required, tag=None):
         application = self._current_application()
+
         if isstr(locator):
-            _locator = locator
+            # Normalize any unicode as explained here, http://appium.io/slate/en/master/?javascript#multi-lingual-support
+            if self._get_platform() == 'ios':
+                _locator = normalize('NFD', locator)
+            else:
+                _locator = locator
             elements = self._element_finder.find(application, _locator, tag)
             if required and len(elements) == 0:
                 raise ValueError("Element locator '" + locator + "' did not match any elements.")
@@ -574,24 +617,6 @@ class _ElementKeywords(KeywordGroup):
         # do some other stuff here like deal with list of webelements
         # ... or raise locator/element specific error if required
         return elements
-
-    def _element_find_by_text(self, text, exact_match=False):
-        if self._get_platform() == 'ios':
-            element = self._element_find(text, True, False)
-            if element:
-                return element
-            else:
-                if exact_match:
-                    _xpath = u'//*[@value="{}" or @label="{}"]'.format(text, text)
-                else:
-                    _xpath = u'//*[contains(@label,"{}") or contains(@value, "{}")]'.format(text, text)
-                return self._element_find(_xpath, True, True)
-        elif self._get_platform() == 'android':
-            if exact_match:
-                _xpath = u'//*[@{}="{}"]'.format('text', text)
-            else:
-                _xpath = u'//*[contains(@{},"{}")]'.format('text', text)
-            return self._element_find(_xpath, True, True)
 
     def _get_text(self, locator):
         element = self._element_find(locator, True, True)
@@ -608,10 +633,17 @@ class _ElementKeywords(KeywordGroup):
         application = self._current_application()
         elements = self._element_finder.find(application, locator, None)
         return len(elements) > 0
-        
+
     def _is_visible(self, locator):
         element = self._element_find(locator, True, False)
         if element is not None:
             return element.is_displayed()
         return None
 
+    def _auto_screenshot(self):
+        platform_name = self._current_application().desired_capabilities['platformName']
+        if platform_name.lower() == "android":
+           # self.screenshot_for_H5("android_auto")
+           self.screenshot("android_auto")
+        if platform_name.lower() == "ios":
+            self.screenshot("ios_auto")

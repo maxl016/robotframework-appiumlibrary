@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
 
 from appium.webdriver.common.touch_action import TouchAction
-
 from AppiumLibrary.locators import ElementFinder
 from .keywordgroup import KeywordGroup
+import string
 
 
 class _TouchKeywords(KeywordGroup):
-
     def __init__(self):
         self._element_finder = ElementFinder()
 
@@ -28,7 +27,7 @@ class _TouchKeywords(KeywordGroup):
         element = self._element_find(locator, True, True)
         driver.pinch(element=element, percent=percent, steps=steps)
 
-    def swipe(self, start_x, start_y, offset_x, offset_y, duration=1000):
+    def swipe(self, start_x, start_y, offset_x, offset_y, duration=1000, isScreenshot='N'):
         """
         Swipe from one point to another point, for an optional duration.
 
@@ -38,49 +37,20 @@ class _TouchKeywords(KeywordGroup):
          - offset_x - x-coordinate distance from start_x at which to stop
          - offset_y - y-coordinate distance from start_y at which to stop
          - duration - (optional) time to take the swipe, in ms.
+         - isScreenshot - screenshot on-off
 
         Usage:
         | Swipe | 500 | 100 | 100 | 0 | 1000 |
 
-        _*NOTE: *_ 
-        Android 'Swipe' is not working properly, use ``offset_x`` and ``offset_y`` as if these are destination points.
+        *!Important Note:* Android `Swipe` is not working properly, use ``offset_x`` and ``offset_y``
+        as if these are destination points.
         """
         driver = self._current_application()
+        if isScreenshot.lower() == 'y':
+            self._auto_screenshot()
         driver.swipe(start_x, start_y, offset_x, offset_y, duration)
-
-    def swipe_by_percent(self, start_x, start_y, end_x, end_y, duration=1000):
-        """
-        Swipe from one percent of the screen to another percent, for an optional duration. 
-        Normal swipe fails to scale for different screen resolutions, this can be avoided using percent.
-
-        Args:
-         - start_x - x-percent at which to start
-         - start_y - y-percent at which to start
-         - end_x - x-percent distance from start_x at which to stop
-         - end_y - y-percent distance from start_y at which to stop
-         - duration - (optional) time to take the swipe, in ms.
-         
-        Usage:
-        | Swipe By Percent | 90 | 50 | 10 | 50 | # Swipes screen from right to left. |
-
-        _*NOTE: *_
-        This also considers swipe acts different between iOS and Android.
-        
-        New in AppiumLibrary 1.4.5
-        """
-        width = self.get_window_width()
-        height = self.get_window_height()
-        x_start = float(start_x) / 100 * width
-        x_end = float(end_x) / 100 * width
-        y_start = float(start_y) / 100 * height
-        y_end = float(end_y) / 100 * height
-        x_offset = x_end - x_start
-        y_offset = y_end - y_start
-        platform = self._get_platform()
-        if platform == 'android':
-            self.swipe(x_start, y_start, x_end, y_end, duration)
-        else:
-            self.swipe(x_start, y_start, x_offset, y_offset, duration)
+        if isScreenshot.lower() == 'y':
+            self._auto_screenshot()
 
     def scroll(self, start_locator, end_locator):
         """
@@ -123,17 +93,27 @@ class _TouchKeywords(KeywordGroup):
         driver = self._current_application()
         el = self._element_find(locator, True, True)
         action = TouchAction(driver)
-        action.tap(el,x_offset,y_offset, count).perform()
+        action.tap(el, x_offset, y_offset, count).perform()
+
+    def double_tap(self, locator):
+        """ Double Tap element identified by ``locator``.
+
+        This behave differently compared to `Tap(count=2)` since execute double tap event in one action.
+        """
+        driver = self._current_application()
+        el = self._element_find(locator, True, True)
+        action = TouchAction(driver)
+        action.press(el).move_to(x=100, y=0).release().perform()
 
     def click_a_point(self, x=0, y=0, duration=100):
         """ Click on a point"""
-        self._info("Clicking on a point (%s,%s)." % (x,y))
+        self._info("Clicking on a point (%s,%s)." % (x, y))
         driver = self._current_application()
         action = TouchAction(driver)
         try:
             action.press(x=float(x), y=float(y)).wait(float(duration)).release().perform()
         except:
-            assert False, "Can't click on a point at (%s,%s)" % (x,y)
+            assert False, "Can't click on a point at (%s,%s)" % (x, y)
 
     def click_element_at_coordinates(self, coordinate_X, coordinate_Y):
         """ click element at a certain coordinate """
@@ -141,3 +121,75 @@ class _TouchKeywords(KeywordGroup):
         driver = self._current_application()
         action = TouchAction(driver)
         action.press(x=coordinate_X, y=coordinate_Y).release().perform()
+
+    def click_element_at_screen_scale(self, scale_X, scale_Y):
+        """click element at a screen scale
+
+        eg. screen resolution is 1080*1920, coordinate_X = 500,coordinate_Y=1000
+
+        then scale_X should be 500/1800, scale_Y should be 1000/1920
+
+        click_element_at_screen_scale(0.8,0.9)
+        """
+        width, height = self._get_screen_size()
+        try:
+            coordinate_X = float(scale_X) * float(width)
+            coordinate_Y = float(scale_Y) * float(height)
+        except ValueError:
+            self._error("Please check your param,scale_X or scale_Y is not float.")
+        self._info("Pressing at (%s, %s)." % (coordinate_X, coordinate_Y))
+        driver = self._current_application()
+        action = TouchAction(driver)
+        action.press(x=coordinate_X, y=coordinate_Y).release().perform()
+
+    def get_screen_size(self):
+        # driver = self._current_application()
+        # size = driver.get_window_size()
+        width, height = self._get_screen_size()
+        return width, height
+
+    def _get_screen_size(self):
+        driver = self._current_application()
+        size = driver.get_window_size()
+        return size['width'], size['height']
+
+    def _auto_screenshot(self):
+        platform_name = self._current_application().desired_capabilities['platformName']
+        if platform_name.lower() == "android":
+            self.screenshot_for_H5("android_auto")
+        if platform_name.lower() == "ios":
+            self.screenshot("ios_auto")
+
+    def multi_swipe_for_android(self, Point=None):
+        """Point 是手势密码坐标点集合.
+
+        point=第一个点集合，第二个点集合，...
+
+        第二个点坐标是相对于第一个坐标的位置，从a滑动到b  a坐标为 100:200 ,b坐标为 500,200
+
+        那么，Point=100:200，400:0，第二个点相对于第一个点 位置为 (500-100) : (200-200)
+
+        依次类推，第三个点坐标是相对第二个点的位置，例如：三个点原坐标list为：
+
+        list=170:710,538:710,906:710，那么，Point=170:710,368:0,368:0
+        """
+        driver = self._current_application()
+        action = TouchAction(driver)
+        point = string.split(Point, ",")
+        x1 = string.split(point[0], ":")[0]
+        y1 = string.split(point[0], ":")[1]
+
+        cmd = "action.press(x=%s,y=%s).wait(500)" % (x1, y1)
+
+        for i in range(len(point)):
+            if i == 0:
+                pass
+            else:
+                x = string.split(point[i], ":")[0]
+                y = string.split(point[i], ":")[1]
+                cmd += ".move_to(x=%s,y=%s).wait(500)" % (x, y)
+        cmd += ".release().perform()"
+
+        self._info("scroll cmd is %s" % cmd)
+
+        exec (cmd)

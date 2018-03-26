@@ -129,10 +129,17 @@ class _WaitingKeywords(KeywordGroup):
             if not timeout_error:
                 return
             if time.time() > maxtime:
-                self.log_source()
+                # self.log_source()
                 raise AssertionError(timeout_error)
             time.sleep(0.2)
 
     def _format_timeout(self, timeout):
         timeout = robot.utils.timestr_to_secs(timeout) if timeout is not None else self._timeout_in_secs
         return robot.utils.secs_to_timestr(timeout)
+
+    def _auto_screenshot(self):
+        platform_name = self._current_application().desired_capabilities['platformName']
+        if platform_name.lower() == "android":
+            self.screenshot_for_H5("android_auto")
+        if platform_name.lower() == "ios":
+            self.screenshot("ios_auto")

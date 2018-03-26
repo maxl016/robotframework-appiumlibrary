@@ -46,3 +46,6 @@ class _LoggingKeywords(KeywordGroup):
 
     def _warn(self, message):
         logger.warn(message)
+
+    def _error(self,message):
+        logger.error(message)
