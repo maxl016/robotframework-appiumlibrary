@@ -48,6 +48,20 @@ class _ApplicationManagementKeywords(KeywordGroup):
         | Open Application | http://localhost:4723/wd/hub | alias=Myapp1         | platformName=iOS      | platformVersion=7.0            | deviceName='iPhone Simulator'           | app=your.app                         |
         | Open Application | http://localhost:4723/wd/hub | platformName=Android | platformVersion=4.2.2 | deviceName=192.168.56.101:5555 | app=${CURDIR}/demoapp/OrangeDemoApp.apk | appPackage=com.netease.qa.orangedemo | appActivity=MainActivity |
         """
+        if kwargs['platformName'] == 'Android':
+            # Android 设备chrome driver 适配
+            chromedriverpath = self._chromedriveradaper.adapterChromeDriver(udid=kwargs['udid'])
+            if chromedriverpath != '':
+                # 获取chromedriver路径
+                kwargs['chromedriverExecutable'] = chromedriverpath
+
+                self._debug('chrome driver path is %s' % chromedriverpath)
+
+            # Android7.0以上版本使用uiautomator2
+            if cmp(kwargs['platformVersion'], '7.0') > -1:
+                kwargs['automationName'] = 'uiautomator2'
+                self._debug('Android Device version is higher than 6.0, use uiautomator2')
+
         desired_caps = kwargs
         application = webdriver.Remote(str(remote_url), desired_caps)
 
